@@ -1,0 +1,138 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>タイマー</title>
+<style>
+  body {
+    background: #222;
+    color: #fff;
+    font-family: sans-serif;
+    text-align: center;
+    padding: 20px;
+    margin: 0;
+  }
+  #display {
+    font-size: 80px;
+    color: #00BCD4;
+    font-weight: bold;
+    margin: 40px 0;
+  }
+  button {
+    font-size: 20px;
+    padding: 15px 30px;
+    margin: 5px;
+    border: none;
+    border-radius: 8px;
+    background: #00BCD4;
+    color: #000;
+    font-weight: bold;
+  }
+  input {
+    font-size: 20px;
+    padding: 10px;
+    width: 80px;
+    text-align: center;
+    border: none;
+    border-radius: 8px;
+  }
+</style>
+</head>
+<body>
+
+<h1>タイマー</h1>
+<div id="display">00:10</div>
+
+<input id="input" type="number" value="10">
+<button onclick="setTime()">設定</button>
+<br>
+<button id="startBtn" onclick="toggleTimer()">スタート</button>
+<button onclick="resetTimer()">リセット</button>
+
+<script>
+  let remaining = 10;
+  let initialTime = 10;
+  let isRunning = false;
+  let timerId = null;
+
+  const display = document.getElementById('display');
+  const startBtn = document.getElementById('startBtn');
+  const input = document.getElementById('input');
+
+  function formatTime(sec) {
+    const m = Math.floor(sec / 60);
+    const s = sec % 60;
+    return String(m).padStart(2, '0') + ':' + String(s).padStart(2, '0');
+  }
+
+  function updateDisplay() {
+    display.textContent = formatTime(remaining);
+  }
+
+  function toggleTimer() {
+    if (isRunning) {
+      clearInterval(timerId);
+      isRunning = false;
+      startBtn.textContent = 'スタート';
+    } else {
+      if (remaining <= 0) return;
+      isRunning = true;
+      startBtn.textContent = '一時停止';
+      timerId = setInterval(tick, 1000);
+    }
+  }
+
+  function tick() {
+    remaining--;
+    updateDisplay();
+    if (remaining <= 0) {
+      remaining = 0;
+      updateDisplay();
+      clearInterval(timerId);
+      isRunning = false;
+      startBtn.textContent = 'スタート';
+      beep();
+      setTimeout(autoReset, 3000);
+    }
+  }
+
+  function autoReset() {
+    remaining = initialTime;
+    updateDisplay();
+  }
+
+  function resetTimer() {
+    clearInterval(timerId);
+    isRunning = false;
+    remaining = initialTime;
+    updateDisplay();
+    startBtn.textContent = 'スタート';
+  }
+
+  function setTime() {
+    const value = parseInt(input.value);
+    if (isNaN(value) || value <= 0) return;
+    clearInterval(timerId);
+    isRunning = false;
+    remaining = value;
+    initialTime = value;
+    updateDisplay();
+    startBtn.textContent = 'スタート';
+  }
+
+  function beep() {
+    // スマホなら振動、PCなら音
+    if (navigator.vibrate) navigator.vibrate([300, 100, 300]);
+    const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+    const osc = audioCtx.createOscillator();
+    osc.frequency.value = 1000;
+    osc.connect(audioCtx.destination);
+    osc.start();
+    osc.stop(audioCtx.currentTime + 0.3);
+  }
+
+  updateDisplay();
+</script>
+</body>
+</html>
