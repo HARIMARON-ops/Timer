@@ -1,0 +1,255 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>タイマー</title>
+<style>
+  body {
+    background: #222;
+    color: #fff;
+    font-family: sans-serif;
+    text-align: center;
+    padding: 20px;
+    margin: 0;
+  }
+  h1 {
+    font-size: 20px;
+    color: #888;
+    margin-bottom: 10px;
+  }
+  #display {
+    font-size: 80px;
+    color: #00BCD4;
+    font-weight: bold;
+    margin: 40px 0;
+    font-variant-numeric: tabular-nums;
+  }
+  button {
+    font-size: 20px;
+    padding: 15px 30px;
+    margin: 5px;
+    border: none;
+    border-radius: 8px;
+    background: #00BCD4;
+    color: #000;
+    font-weight: bold;
+    cursor: pointer;
+  }
+  button:active {
+    background: #0097A7;
+  }
+  #startBtn {
+    font-size: 24px;
+    padding: 20px 40px;
+  }
+  #startBtn.running {
+    background: #E53935;
+    color: #fff;
+  }
+  input {
+    font-size: 20px;
+    padding: 10px;
+    width: 80px;
+    text-align: center;
+    border: none;
+    border-radius: 8px;
+    background: #444;
+    color: #fff;
+  }
+  .preset {
+    font-size: 14px;
+    padding: 8px 12px;
+    margin: 3px;
+    background: #333;
+    color: #fff;
+  }
+  .preset:active {
+    background: #555;
+  }
+</style>
+</head>
+<body>
+
+<h1>タイマー</h1>
+<div id="display">00:10</div>
+
+<div>
+  <input id="input" type="number" value="10" min="1">
+  <button onclick="setTime()">設定</button>
+</div>
+
+<div style="margin-top:10px;">
+  <button class="preset" onclick="presetTime(10)">10秒</button>
+  <button class="preset" onclick="presetTime(60)">1分</button>
+  <button class="preset" onclick="presetTime(180)">3分</button>
+  <button class="preset" onclick="presetTime(300)">5分</button>
+</div>
+
+<div style="margin-top:20px;">
+  <button id="startBtn" onclick="toggleTimer()">スタート</button>
+</div>
+<div>
+  <button class="preset" onclick="resetTimer()">リセット</button>
+</div>
+
+<script>
+  // ---------- 状態 ----------
+  let remaining = 10;
+  let initialTime = 10;
+  let isRunning = false;
+  let timerId = null;
+  let audioCtx = null;
+
+  // ---------- 要素 ----------
+  const display = document.getElementById('display');
+  const startBtn = document.getElementById('startBtn');
+  const input = document.getElementById('input');
+
+  // ---------- 表示 ----------
+  function formatTime(sec) {
+    const m = Math.floor(sec / 60);
+    const s = sec % 60;
+    return String(m).padStart(2, '0') + ':' + String(s).padStart(2, '0');
+  }
+
+  function updateDisplay() {
+    display.textContent = formatTime(remaining);
+  }
+
+  // ---------- 音の初期化（スマホ用） ----------
+  function initAudio() {
+    if (!audioCtx) {
+      audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+    }
+    if (audioCtx.state === 'suspended') {
+      audioCtx.resume();
+    }
+  }
+
+  // ---------- ビープ音 ----------
+  function beep() {
+    // 振動（Androidのみ）
+    if (navigator.vibrate) {
+      navigator.vibrate([300, 100, 300, 100, 300]);
+    }
+
+    // 音（3回鳴らす）
+    if (!audioCtx) return;
+    for (let i = 0; i < 3; i++) {
+      const osc = audioCtx.createOscillator();
+      const gain = audioCtx.createGain();
+      osc.type = 'sine';
+      osc.frequency.value = 1000;
+      osc.connect(gain);
+      gain.connect(audioCtx.destination);
+
+      const startTime = audioCtx.currentTime + i * 0.4;
+      const endTime = startTime + 0.3;
+
+      gain.gain.setValueAtTime(0.3, startTime);
+      gain.gain.setValueAtTime(0.3, endTime - 0.05);
+      gain.gain.linearRampToValueAtTime(0, endTime);
+
+      osc.start(startTime);
+      osc.stop(endTime);
+    }
+  }
+
+  // ---------- メインロジック ----------
+  function toggleTimer() {
+    if (isRunning) {
+      // 停止
+      clearInterval(timerId);
+      isRunning = false;
+      startBtn.textContent = 'スタート';
+      startBtn.classList.remove('running');
+    } else {
+      // 開始
+      if (remaining <= 0) return;
+      initAudio();          // ← スマホで音を鳴らすための許可取得
+      isRunning = true;
+      startBtn.textContent = '一時停止';
+      startBtn.classList.add('running');
+      timerId = setInterval(tick, 1000);
+    }
+  }
+
+  function tick() {
+    remaining--;
+    updateDisplay();
+
+    if (remaining <= 0) {
+      remaining = 0;
+      updateDisplay();
+      clearInterval(timerId);
+      isRunning = false;
+      startBtn.textContent = 'スタート';
+      startBtn.classList.remove('running');
+      beep();
+      blink();
+      setTimeout(autoReset, 3000);
+    }
+  }
+
+  // ---------- 点滅 ----------
+  function blink(count = 6) {
+    if (count <= 0) {
+      display.style.color = '#00BCD4';
+      return;
+    }
+    const current = display.style.color;
+    display.style.color = (current === 'rgb(255, 255, 255)') ? '#E53935' : '#FFFFFF';
+    setTimeout(() => blink(count - 1), 300);
+  }
+
+  // ---------- 自動リセット ----------
+  function autoReset() {
+    remaining = initialTime;
+    display.style.color = '#00BCD4';
+    updateDisplay();
+  }
+
+  // ---------- リセット ----------
+  function resetTimer() {
+    clearInterval(timerId);
+    isRunning = false;
+    remaining = initialTime;
+    updateDisplay();
+    startBtn.textContent = 'スタート';
+    startBtn.classList.remove('running');
+    display.style.color = '#00BCD4';
+  }
+
+  // ---------- 時間設定 ----------
+  function setTime() {
+    const value = parseInt(input.value);
+    if (isNaN(value) || value <= 0) return;
+    clearInterval(timerId);
+    isRunning = false;
+    remaining = value;
+    initialTime = value;
+    updateDisplay();
+    startBtn.textContent = 'スタート';
+    startBtn.classList.remove('running');
+    display.style.color = '#00BCD4';
+  }
+
+  // ---------- プリセット ----------
+  function presetTime(seconds) {
+    clearInterval(timerId);
+    isRunning = false;
+    remaining = seconds;
+    initialTime = seconds;
+    updateDisplay();
+    startBtn.textContent = 'スタート';
+    startBtn.classList.remove('running');
+    display.style.color = '#00BCD4';
+    input.value = seconds;
+  }
+
+  // ---------- 初期表示 ----------
+  updateDisplay();
+</script>
+</body>
+</html>
